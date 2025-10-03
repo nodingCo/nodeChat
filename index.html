@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Node Chat</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link
+      rel="stylesheet"
+      as="style"
+      crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+    />
+    <style>
+      /* CSS 스타일은 이전과 동일하게 유지됩니다. */
+      :root {
+        --background-color: #f0f2f5;
+        --container-bg: #ffffff;
+        --primary-accent: #6c5ce7;
+        --secondary-accent: #a29bfe;
+        --sent-bubble-bg: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+        --received-bubble-bg: #e4e6eb;
+        --text-primary: #1c1e21;
+        --text-secondary: #65676b;
+        --border-color: #ced0d4;
+        --header-bg: #ffffff;
+      }
+      body {
+        font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial, sans-serif;
+        margin: 0;
+        background-color: var(--background-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        color: var(--text-primary);
+      }
+      .container {
+        width: 100%;
+        max-width: 400px;
+        height: 95vh;
+        max-height: 800px;
+        background-color: var(--container-bg);
+        border-radius: 24px;
+        box-shadow: 0 12px 28px 0 rgba(0, 0, 0, 0.2),
+          0 2px 4px 0 rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #entry-screen {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 40px;
+        text-align: center;
+        height: 100%;
+        background: linear-gradient(120deg, #a29bfe 0%, #d6a2e8 100%);
+        color: white;
+      }
+      #entry-screen h1 {
+        font-size: 28px;
+        margin-bottom: 15px;
+        font-weight: 600;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      #entry-screen p {
+        color: rgba(255, 255, 255, 0.85);
+        margin-bottom: 40px;
+      }
+      #room-key-input,
+      #nickname-input {
+        width: 100%;
+        padding: 15px;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        text-align: center;
+        background-color: rgba(255, 255, 255, 0.2);
+        color: white;
+        transition: background-color 0.3s;
+      }
+      #room-key-input {
+        margin-bottom: 20px;
+      }
+      #room-key-input::placeholder,
+      #nickname-input::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+      }
+      #room-key-input:focus,
+      #nickname-input:focus {
+        outline: none;
+        background-color: rgba(255, 255, 255, 0.3);
+      }
+      #entry-button {
+        width: 100%;
+        padding: 15px;
+        border: none;
+        border-radius: 12px;
+        background-color: white;
+        color: var(--primary-accent);
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+      #entry-button:hover {
+        transform: translateY(-2px);
+      }
+      .nickname-wrapper {
+        display: flex;
+        width: 100%;
+        margin-bottom: 10px;
+        gap: 8px;
+      }
+      #nickname-input {
+        flex-grow: 1;
+      }
+      #regen-nickname-btn {
+        flex-shrink: 0;
+        width: 50px;
+        border: none;
+        border-radius: 12px;
+        background-color: rgba(255, 255, 255, 0.2);
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+      #regen-nickname-btn:hover {
+        transform: rotate(90deg);
+      }
+      #chat-screen {
+        display: none;
+        flex-direction: column;
+        height: 100%;
+      }
+      .chat-header {
+        padding: 15px 20px;
+        background-color: var(--header-bg);
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        z-index: 10;
+      }
+      .title-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #room-title {
+        font-weight: 600;
+        font-size: 18px;
+      }
+      #recommend-btn {
+        background: var(--secondary-accent);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.2s;
+      }
+      #recommend-btn:hover {
+        transform: scale(1.1) rotate(90deg);
+      }
+      #leave-button {
+        background: transparent;
+        color: var(--text-secondary);
+        border: none;
+        padding: 5px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background-color 0.2s, color 0.2s;
+      }
+      #leave-button:hover {
+        background-color: #f0f0f0;
+        color: #d63031;
+      }
+      .chat-log {
+        flex-grow: 1;
+        padding: 20px 15px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background-color: #f7f7f7;
+      }
+      .message {
+        max-width: 70%;
+        padding: 10px 15px;
+        border-radius: 20px;
+        word-wrap: break-word;
+        line-height: 1.5;
+        position: relative;
+      }
+      .message.sent {
+        background: var(--sent-bubble-bg);
+        color: white;
+        align-self: flex-end;
+        border-bottom-right-radius: 5px;
+      }
+      .message.received {
+        background: var(--received-bubble-bg);
+        color: var(--text-primary);
+        align-self: flex-start;
+        border-bottom-left-radius: 5px;
+      }
+      .system-message {
+        text-align: center;
+        color: var(--text-secondary);
+        font-style: italic;
+        font-size: 13px;
+        padding: 10px 0;
+        width: 100%;
+        align-self: center;
+      }
+      .chat-form {
+        display: flex;
+        padding: 15px;
+        border-top: 1px solid #f0f0f0;
+        background-color: #fff;
+        align-items: center;
+        gap: 10px;
+      }
+      #message-input {
+        flex-grow: 1;
+        padding: 12px 18px;
+        border: none;
+        border-radius: 22px;
+        background-color: #f0f2f5;
+        font-size: 15px;
+      }
+      #message-input:focus {
+        outline: none;
+      }
+      #send-button {
+        background: var(--primary-accent);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+        font-size: 18px;
+        transition: transform 0.2s;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      #send-button:hover {
+        transform: scale(1.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div id="entry-screen">
+        <h1>Node Chat 🤫</h1>
+        <p>비밀 코드를 입력하여<br />노드에 접속하세요.</p>
+        <div class="nickname-wrapper">
+          <input
+            type="text"
+            id="nickname-input"
+            placeholder="닉네임을 입력하세요"
+            autocomplete="off"
+            maxlength="10"
+          />
+          <button id="regen-nickname-btn">🔄</button>
+        </div>
+        <input
+          type="text"
+          id="room-key-input"
+          placeholder="비밀 코드..."
+          autocomplete="off"
+        />
+        <button id="entry-button">접속</button>
+      </div>
+
+      <div id="chat-screen">
+        <div class="chat-header">
+          <div class="title-wrapper">
+            <span id="room-title"></span>
+            <button id="recommend-btn" style="display: none">↪︎</button>
+          </div>
+          <button id="leave-button">나가기</button>
+        </div>
+        <div class="chat-log" id="chat-log"></div>
+        <div class="chat-form">
+          <input
+            type="text"
+            id="message-input"
+            placeholder="메시지 또는 /go <노드 키>"
+            autocomplete="off"
+          />
+          <button id="send-button">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- 1. 기본 요소 가져오기 (이전과 동일) ---
+      const nicknameInput = document.getElementById("nickname-input");
+      const regenNicknameBtn = document.getElementById("regen-nickname-btn");
+      const entryScreen = document.getElementById("entry-screen");
+      const chatScreen = document.getElementById("chat-screen");
+      const entryButton = document.getElementById("entry-button");
+      const leaveButton = document.getElementById("leave-button");
+      const messageInput = document.getElementById("message-input");
+      const sendButton = document.getElementById("send-button");
+      const roomKeyInput = document.getElementById("room-key-input");
+      const roomTitle = document.getElementById("room-title");
+      const chatLog = document.getElementById("chat-log");
+      const recommendBtn = document.getElementById("recommend-btn");
+
+      // --- 2. 서버 연결 및 상태 변수 ---
+      const socket = io("https://popsup.onrender.com");
+      let currentUser = { id: null, localId: null, nickname: null };
+      let currentRoomKey = null;
+      let nodeEntryTime = null;
+
+      // --- 3. 닉네임 생성 및 사용자 식별자(localId) 설정 ---
+      const adjectives = [
+        "용감한",
+        "슬기로운",
+        "빛나는",
+        "행복한",
+        "고요한",
+        "날쌘",
+        "우아한",
+        "명랑한",
+      ];
+      const nouns = [
+        "호랑이",
+        "세종대왕",
+        "아이유",
+        "독수리",
+        "손흥민",
+        "돌고래",
+        "이순신",
+        "김연아",
+      ];
+
+      function generateRandomNickname() {
+        const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        return `${adj} ${noun}`;
+      }
+
+      // ✨ 핵심 수정: 사용자 고유 식별자(localId) 설정 함수
+      function setupUserIdentity() {
+        let localId = localStorage.getItem("userLocalId");
+        if (!localId) {
+          localId = "user_" + Math.random().toString(36).substr(2, 16);
+          localStorage.setItem("userLocalId", localId);
+        }
+        currentUser.localId = localId;
+
+        let storedNickname = localStorage.getItem("userNickname");
+        nicknameInput.value = storedNickname
+          ? storedNickname
+          : generateRandomNickname();
+      }
+
+      // --- 4. 핵심 함수들 ---
+
+      // ✨ 핵심 수정: joinChat 함수 로직 변경
+      function joinChat() {
+        const nickname = nicknameInput.value.trim();
+        const roomKey = roomKeyInput.value.trim();
+
+        if (!nickname || nickname.length > 10 || !roomKey) {
+          alert("닉네임(10자 이하)과 비밀 코드를 모두 올바르게 입력해주세요.");
+          return;
+        }
+        currentUser.nickname = nickname;
+        localStorage.setItem("userNickname", nickname);
+
+        // localId와 닉네임을 함께 보내 세션을 수립합니다.
+        socket.emit("userSetup", {
+          localId: currentUser.localId,
+          nickname: currentUser.nickname,
+        });
+      }
+
+      // ... goToNode, leaveChat 등 나머지 함수들은 이전 최종 버전과 동일 ...
+      function goToNode(nodeKey, transitionType) {
+        if (!nodeKey || !currentUser.id) return; // currentUser.id가 없으면 실행 안 함
+        const duration = nodeEntryTime
+          ? Math.round((Date.now() - nodeEntryTime) / 1000)
+          : 0;
+        const transitionData = {
+          userId: currentUser.id,
+          fromNodeKey: currentRoomKey,
+          toNodeKey: nodeKey,
+          duration: duration,
+          transitionType: transitionType,
+        };
+        socket.emit("joinNodeAndLogTransition", transitionData);
+        currentRoomKey = nodeKey;
+        nodeEntryTime = Date.now();
+        roomTitle.textContent = `🔒 ${nodeKey}`;
+        chatLog.innerHTML = "";
+        recommendBtn.style.display = "none";
+        socket.emit("getRecommendation", { roomKey: nodeKey });
+      }
+      function leaveChat() {
+        currentRoomKey = null;
+        nodeEntryTime = null;
+        chatScreen.style.display = "none";
+        entryScreen.style.display = "flex";
+        chatLog.innerHTML = "";
+      }
+      function addMessageToLog(message) {
+        const msgDiv = document.createElement("div");
+        msgDiv.classList.add("message");
+        if (message.userId === currentUser.id) {
+          msgDiv.classList.add("sent");
+          msgDiv.textContent = message.text;
+        } else {
+          msgDiv.classList.add("received");
+          msgDiv.textContent = `[${message.senderNickname}] ${message.text}`;
+        }
+        chatLog.appendChild(msgDiv);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      function addSystemMessage(text) {
+        const msgDiv = document.createElement("div");
+        msgDiv.classList.add("system-message");
+        msgDiv.textContent = text;
+        chatLog.appendChild(msgDiv);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      function handleInput() {
+        const text = messageInput.value.trim();
+        if (!text) return;
+        if (text.startsWith("/go ")) {
+          const nodeKey = text.substring(4).trim();
+          if (nodeKey) goToNode(nodeKey, "GO_COMMAND");
+        } else {
+          if (!currentRoomKey || !currentUser.id) return;
+          const messageData = {
+            userId: currentUser.id,
+            nodeKey: currentRoomKey,
+            text: text,
+          };
+          socket.emit("sendMessage", messageData);
+        }
+        messageInput.value = "";
+      }
+
+      // --- 5. 서버로부터 오는 이벤트 듣기 ---
+
+      // ✨ 핵심 수정: sessionEstablished 리스너 로직 변경
+      socket.on("sessionEstablished", ({ userId, nickname }) => {
+        currentUser.id = userId;
+        currentUser.nickname = nickname;
+        console.log("세션 연결 완료:", currentUser);
+
+        // 세션이 성공적으로 수립된 후에만 방 입장 로직을 실행합니다.
+        if (entryScreen.style.display !== "none") {
+          const roomKey = roomKeyInput.value.trim();
+          goToNode(roomKey, "INITIAL");
+          entryScreen.style.display = "none";
+          chatScreen.style.display = "flex";
+          roomKeyInput.value = "";
+        }
+      });
+
+      // ... 나머지 이벤트 리스너는 이전 최종 버전과 동일 ...
+      socket.on("history", (messages) => {
+        chatLog.innerHTML = "";
+        messages.forEach(addMessageToLog);
+        addSystemMessage(
+          "Pro-tip: 다른 노드로 이동하려면 '/go <노드 이름>'을 입력해보세요!"
+        );
+      });
+      socket.on("receiveMessage", (message) => {
+        addMessageToLog(message);
+      });
+      socket.on("recommendationResult", ({ recommendedKey }) => {
+        if (recommendedKey) {
+          recommendBtn.style.display = "flex";
+          recommendBtn.onclick = () =>
+            goToNode(recommendedKey, "RECOMMENDATION");
+        }
+      });
+
+      // --- 6. 이벤트 핸들러 연결 및 초기 설정 ---
+      entryButton.addEventListener("click", joinChat);
+      roomKeyInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") joinChat();
+      });
+      leaveButton.addEventListener("click", leaveChat);
+      sendButton.addEventListener("click", handleInput);
+      messageInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") handleInput();
+      });
+      regenNicknameBtn.addEventListener("click", () => {
+        nicknameInput.value = generateRandomNickname();
+      });
+
+      // 페이지가 로드되면 사용자의 고유 식별자와 닉네임을 설정합니다.
+      setupUserIdentity();
+    </script>
+  </body>
+</html>
