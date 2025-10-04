@@ -196,15 +196,15 @@
         overflow-y: auto;
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        background-color: #f7f7f7;
+        gap: 4px; /* 버블 간 간격 줄임 */
+        background-color: #ffffff; /* 배경을 흰색으로 변경 */
       }
       .message {
-        max-width: 70%;
-        padding: 10px 15px;
-        border-radius: 20px;
+        max-width: 75%;
+        padding: 8px 14px; /* 내부 여백(상하/좌우) 줄임 */
+        border-radius: 18px;
         word-wrap: break-word;
-        line-height: 1.5;
+        line-height: 1.4; /* 줄 간격 약간 줄임 */
         position: relative;
       }
       .message.sent {
@@ -214,7 +214,7 @@
         border-bottom-right-radius: 5px;
       }
       .message.received {
-        background: var(--received-bubble-bg);
+        background: #f0f2f5; /* 받는 메시지 배경을 더 차분하게 */
         color: var(--text-primary);
         align-self: flex-start;
         border-bottom-left-radius: 5px;
