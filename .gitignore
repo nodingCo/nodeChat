@@ -22,3 +22,5 @@ npm-debug.log
 # 나중에 프로젝트가 복잡해지면 생성될 수 있는 폴더입니다.
 build/
 dist/
+
+index copy.html
