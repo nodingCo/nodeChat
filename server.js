@@ -16,7 +16,7 @@ app.get("/", (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: "*", // 클라이언트 앱 URL (예: "https://nodingco.github.io")로 변경하는 것이 보안상 더 좋습니다.
     methods: ["GET", "POST"],
   },
 });
@@ -35,6 +35,12 @@ const userSchema = new mongoose.Schema({
   nickname: String, // 더 이상 unique가 아님
   createdAt: { type: Date, default: Date.now },
   lastSeenAt: { type: Date, default: Date.now },
+  // UTM 관련 필드 추가
+  utmSource: { type: String },
+  utmMedium: { type: String },
+  utmCampaign: { type: String },
+  utmContent: { type: String },
+  utmTerm: { type: String },
 });
 const User = mongoose.model("User", userSchema);
 
@@ -81,19 +87,42 @@ const Transition = mongoose.model("Transition", transitionSchema);
 io.on("connection", (socket) => {
   console.log(`[연결] 새로운 유저 접속: ${socket.id}`);
 
-  // 사용자 정보 설정 (최초 연결 시)
-  socket.on("userSetup", async ({ localId, nickname }) => {
+  // 사용자 정보 설정 (최초 연결 시 또는 닉네임 변경 시)
+  // ✨ 변경된 부분: localId와 nickname 외에 utm 객체를 받도록 수정
+  socket.on("userSetup", async ({ localId, nickname, utm }) => {
     try {
-      // 이제 localId를 기준으로 사용자를 찾습니다.
+      const updateFields = {
+        nickname: nickname,
+        lastSeenAt: new Date(),
+      };
+
+      // UTM 파라미터가 제공되면 업데이트 필드에 추가합니다.
+      // 처음 접속 시에만 저장하거나, UTM 정보가 변경될 때마다 업데이트할 수 있습니다.
+      // 여기서는 utm 정보가 있을 경우 업데이트하는 로직을 사용합니다.
+      if (utm) {
+        if (utm.source) updateFields.utmSource = utm.source;
+        if (utm.medium) updateFields.utmMedium = utm.medium;
+        if (utm.campaign) updateFields.utmCampaign = utm.campaign;
+        if (utm.content) updateFields.utmContent = utm.content;
+        if (utm.term) updateFields.utmTerm = utm.term;
+      }
+
+      // localId를 기준으로 사용자를 찾아 업데이트하거나 새로 생성합니다.
       const user = await User.findOneAndUpdate(
         { localId: localId },
-        // 닉네임은 접속할 때마다 최신 값으로 업데이트합니다.
         {
-          $set: { nickname: nickname, lastSeenAt: new Date() },
-          $setOnInsert: { localId: localId },
+          $set: updateFields, // 닉네임과 lastSeenAt, 그리고 UTM 필드 업데이트
+          $setOnInsert: { localId: localId, createdAt: new Date() }, // 새로 생성될 때만 localId와 createdAt 설정
         },
-        { upsert: true, new: true }
+        { upsert: true, new: true } // 없으면 새로 만들고, 업데이트된/생성된 문서 반환
       );
+
+      console.log(
+        `[유저 설정] ID: ${user._id}, 닉네임: ${
+          user.nickname
+        }, UTM: ${JSON.stringify(utm)}`
+      );
+
       socket.emit("sessionEstablished", {
         userId: user._id,
         nickname: user.nickname,
@@ -202,6 +231,8 @@ io.on("connection", (socket) => {
         socket.emit("recommendationResult", {
           recommendedKey: recommendation[0].roomKey,
         });
+      } else {
+        socket.emit("recommendationResult", { recommendedKey: null }); // 추천할 노드가 없을 경우
       }
     } catch (error) {
       console.error("[에러] 추천 노드 검색 실패:", error);

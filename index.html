@@ -731,6 +731,18 @@
         socket.emit("getRecommendation", { roomKey: nodeKey });
       }
 
+      // URL에서 UTM 파라미터를 파싱하는 함수
+      function getUtmParameters() {
+        const params = new URLSearchParams(window.location.search);
+        const utm = {};
+        if (params.has("utm_source")) utm.source = params.get("utm_source");
+        if (params.has("utm_medium")) utm.medium = params.get("utm_medium");
+        if (params.has("utm_campaign"))
+          utm.campaign = params.get("utm_campaign");
+        if (params.has("utm_content")) utm.content = params.get("utm_content");
+        if (params.has("utm_term")) utm.term = params.get("utm_term");
+        return utm;
+      }
       function joinChat() {
         const nickname = nicknameInput.value.trim();
         const roomKey = roomKeyInput.value.trim();
@@ -752,6 +764,9 @@
         localStorage.setItem("userNickname", nickname);
         localStorage.setItem("userLanguage", currentLang); // 현재 언어를 함께 저장합니다.
 
+        const utmParams = getUtmParameters(); // UTM 파라미터 가져오기
+
+        // 서버에 userSetup 메시지를 보낼 때 UTM 파라미터를 함께 보냅니다.
         socket.emit("userSetup", {
           localId: currentUser.localId,
           nickname: currentUser.nickname,
