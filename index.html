@@ -875,8 +875,8 @@
         messageInput.value = "";
       }
 
-      <!-- // ✨ 핫 노드를 불러오는 함수 추가
-      async function loadHotNodes() {
+      // ✨ 핫 노드를 불러오는 함수 추가
+      /*async function loadHotNodes() {
         hotNodesList.innerHTML = `<p>${translations[currentLang].loadingHotNodes}</p>`;
         try {
           // Render 서버 URL에 맞게 수정하세요!
@@ -924,7 +924,7 @@
             "인기 노드를 불러오는데 실패했습니다."
           }</p>`;
         }
-      } -->
+      } */
 
       // --- 6. 서버로부터 오는 이벤트 듣기 ---
       socket.on("sessionEstablished", ({ userId, nickname }) => {
