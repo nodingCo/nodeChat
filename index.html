@@ -351,9 +351,9 @@
           entryPlaceholder: "노드 제목 입력",
           joinButton: "접속",
           leaveButton: "나가기",
-          chatPlaceholder: "메시지 또는 /go <노드 키>",
+          chatPlaceholder: "메시지 또는 /go <노드 제목>",
           recommendationNudge:
-            "Pro-tip: 다른 노드로 이동하려면 '/go <노드 이름>'을 입력해보세요!",
+            "Pro-tip: 다른 노드로 이동하려면 '/go <노드 제목>'을 입력해보세요!",
           alertNickname:
             "닉네임(10자 이하)과 노드 제목을 모두 올바르게 입력해주세요.",
         },
@@ -361,15 +361,15 @@
           entryTitle: "Node Chat 🤫",
           entryDescription:
             "Enter a topic you're interested in<br/>and meet people.",
-          nicknamePlaceholder: "Enter your nickname",
+          nicknamePlaceholder: "Enter your nickname (under 20 chars)",
           entryPlaceholder: "Enter a node title",
           joinButton: "Join",
           leaveButton: "Leave",
-          chatPlaceholder: "Message or /go <node key>",
+          chatPlaceholder: "Message or /go <node title>",
           recommendationNudge:
-            "Pro-tip: To move to another node, type '/go <node name>'!",
+            "Pro-tip: To move to another node, type '/go <node title>'!",
           alertNickname:
-            "Please enter a valid nickname (under 10 chars) and a node title.",
+            "Please enter a valid nickname (under 20 chars) and a node title.",
         },
       };
 
@@ -648,10 +648,18 @@
           localStorage.setItem("userLocalId", localId);
         }
         currentUser.localId = localId;
+
+        // 저장된 언어와 현재 언어를 비교합니다.
         let storedNickname = localStorage.getItem("userNickname");
-        nicknameInput.value = storedNickname
-          ? storedNickname
-          : generateRandomNickname();
+        let storedLang = localStorage.getItem("userLanguage");
+
+        // 닉네임이 저장되어 있고 && 저장된 언어가 현재 언어와 같을 때만 불러옵니다.
+        if (storedNickname && storedLang === currentLang) {
+          nicknameInput.value = storedNickname;
+        } else {
+          // 언어가 다르거나 저장된 닉네임이 없으면 새로 생성합니다.
+          nicknameInput.value = generateRandomNickname();
+        }
       }
 
       // --- 5. 핵심 함수들 ---
@@ -716,8 +724,6 @@
       function joinChat() {
         const nickname = nicknameInput.value.trim();
         const roomKey = roomKeyInput.value.trim();
-
-        // 언어별 닉네임 최대 길이 설정
         const maxLength = currentLang === "ko" ? 10 : 20;
 
         if (!nickname || nickname.length > maxLength) {
@@ -734,6 +740,8 @@
 
         currentUser.nickname = nickname;
         localStorage.setItem("userNickname", nickname);
+        localStorage.setItem("userLanguage", currentLang); // 현재 언어를 함께 저장합니다.
+
         socket.emit("userSetup", {
           localId: currentUser.localId,
           nickname: currentUser.nickname,
