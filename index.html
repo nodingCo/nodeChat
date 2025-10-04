@@ -288,6 +288,54 @@
       #send-button:hover {
         transform: scale(1.1);
       }
+
+      /* ✨ 핫 노드 섹션 CSS 추가 */
+      .hot-nodes-section {
+        width: 100%;
+        max-height: 250px; /* 스크롤 가능하도록 높이 제한 */
+        overflow-y: auto;
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        color: white;
+        text-align: left;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .hot-nodes-section h2 {
+        font-size: 18px;
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-weight: 500;
+        text-align: center;
+      }
+      .hot-nodes-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .hot-node-item {
+        background-color: rgba(255, 255, 255, 0.2);
+        padding: 10px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s, transform 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .hot-node-item:hover {
+        background-color: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
+      }
+      .hot-node-item .node-key {
+        font-weight: bold;
+        font-size: 16px;
+      }
+      .hot-node-item .node-stats {
+        font-size: 12px;
+        opacity: 0.8;
+      }
     </style>
   </head>
   <body>
@@ -297,7 +345,13 @@
         <p data-i18n-key="entryDescription">
           지금 관심있는 주제를 입력해서<br />사람들을 만나보세요.
         </p>
-        <div class="nickname-wrapper">
+        <div class="hot-nodes-section">
+          <h2 data-i18n-key="hotNodesTitle">🔥 인기 노드</h2>
+          <div class="hot-nodes-list" id="hot-nodes-list">
+            <p data-i18n-key="loadingHotNodes">인기 노드를 불러오는 중...</p>
+          </div>
+        </div>
+        <div class="nickname-wrapper" style="margin-top: 20px">
           <input
             type="text"
             id="nickname-input"
@@ -356,6 +410,12 @@
             "Pro-tip: 다른 노드로 이동하려면 '/go <노드 제목>'을 입력해보세요!",
           alertNickname:
             "닉네임(10자 이하)과 노드 제목을 모두 올바르게 입력해주세요.",
+          // ✨ 핫 노드 관련 번역 텍스트 추가
+          hotNodesTitle: "🔥 인기 노드",
+          loadingHotNodes: "인기 노드를 불러오는 중...",
+          noHotNodes: "아직 인기 노드가 없습니다.",
+          errorLoadingHotNodes: "인기 노드를 불러오는데 실패했습니다.",
+          nodeStats: "방문수 {visits} | 유저 {users}",
         },
         en: {
           entryTitle: "Node Chat 🤫",
@@ -370,6 +430,12 @@
             "Pro-tip: To move to another node, type '/go <node title>'!",
           alertNickname:
             "Please enter a valid nickname (under 20 chars) and a node title.",
+          // ✨ 핫 노드 관련 번역 텍스트 추가
+          hotNodesTitle: "🔥 Popular Nodes",
+          loadingHotNodes: "Loading popular nodes...",
+          noHotNodes: "No popular nodes yet.",
+          errorLoadingHotNodes: "Failed to load popular nodes.",
+          nodeStats: "Visits {visits} | Users {users}",
         },
       };
 
@@ -402,6 +468,7 @@
       const roomTitle = document.getElementById("room-title");
       const chatLog = document.getElementById("chat-log");
       const recommendBtn = document.getElementById("recommend-btn");
+      const hotNodesList = document.getElementById("hot-nodes-list"); // ✨ 추가
 
       const socket = io("https://nodechat-534n.onrender.com");
       let currentUser = { id: null, localId: null, nickname: null };
@@ -672,8 +739,6 @@
         });
       }
 
-      // index.html의 <script> 태그 안
-
       function addMessageToLog(message) {
         const msgGroup = document.createElement("div");
         msgGroup.classList.add("message-group");
@@ -743,6 +808,7 @@
         if (params.has("utm_term")) utm.term = params.get("utm_term");
         return utm;
       }
+
       function joinChat() {
         const nickname = nicknameInput.value.trim();
         const roomKey = roomKeyInput.value.trim();
@@ -780,6 +846,7 @@
         chatScreen.style.display = "none";
         entryScreen.style.display = "flex";
         chatLog.innerHTML = "";
+        loadHotNodes(); // ✨ 나갈 때 핫 노드 목록을 다시 불러옵니다.
       }
 
       function addSystemMessage(text) {
@@ -806,6 +873,57 @@
           socket.emit("sendMessage", messageData);
         }
         messageInput.value = "";
+      }
+
+      // ✨ 핫 노드를 불러오는 함수 추가
+      async function loadHotNodes() {
+        hotNodesList.innerHTML = `<p>${translations[currentLang].loadingHotNodes}</p>`;
+        try {
+          // Render 서버 URL에 맞게 수정하세요!
+          const response = await fetch(
+            "https://nodechat-534n.onrender.com/hot-nodes?limit=5"
+          );
+          const hotNodes = await response.json();
+
+          hotNodesList.innerHTML = ""; // 기존 로딩 메시지 제거
+
+          if (hotNodes.length === 0) {
+            hotNodesList.innerHTML = `<p>${
+              translations[currentLang].noHotNodes ||
+              "아직 인기 노드가 없습니다."
+            }</p>`;
+            return;
+          }
+
+          hotNodes.forEach((node) => {
+            const nodeItem = document.createElement("div");
+            nodeItem.classList.add("hot-node-item");
+            nodeItem.dataset.roomKey = node.roomKey; // 클릭 시 이동할 roomKey 저장
+
+            const statsText = translations[currentLang].nodeStats
+              .replace("{visits}", node.totalVisits)
+              .replace("{users}", node.uniqueUsersCount);
+
+            nodeItem.innerHTML = `
+                    <span class="node-key">${node.roomKey}</span>
+                    <span class="node-stats">${statsText}</span>
+                `;
+
+            // 클릭 이벤트 핸들러 추가
+            nodeItem.addEventListener("click", () => {
+              roomKeyInput.value = node.roomKey; // 입력 필드에 노드 키 채우기
+              joinChat(); // 바로 접속
+            });
+
+            hotNodesList.appendChild(nodeItem);
+          });
+        } catch (error) {
+          console.error("핫 노드 로드 실패:", error);
+          hotNodesList.innerHTML = `<p>${
+            translations[currentLang].errorLoadingHotNodes ||
+            "인기 노드를 불러오는데 실패했습니다."
+          }</p>`;
+        }
       }
 
       // --- 6. 서버로부터 오는 이벤트 듣기 ---
@@ -860,6 +978,7 @@
 
         setLanguage(currentLang);
         setupUserIdentity();
+        loadHotNodes(); // ✨ 페이지 로드 시 핫 노드 불러오기
       });
     </script>
   </body>

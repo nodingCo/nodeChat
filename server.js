@@ -4,6 +4,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const fetch = require("node-fetch"); // ipinfo.io를 사용하지 않아도 다른 HTTP 요청에 필요할 수 있습니다.
 
 const app = express();
 app.use(cors());
@@ -243,6 +244,119 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`[연결 종료] 유저 연결 끊김: ${socket.id}`);
   });
+});
+
+// ✨ 새로운 HTTP GET 엔드포인트 추가 (socket.io 바깥, app.get 아래에 추가)
+app.get("/hot-nodes", async (req, res) => {
+  try {
+    const hours = parseInt(req.query.hours) || 24; // 최근 몇 시간 데이터를 볼 것인지 (기본 24시간)
+    const limit = parseInt(req.query.limit) || 5; // 몇 개의 노드를 반환할 것인지 (기본 5개)
+    const minVisits = parseInt(req.query.minVisits) || 1; // 최소 방문 횟수 (너무 한산한 노드 제외)
+
+    const cutoffDate = new Date();
+    cutoffDate.setHours(cutoffDate.getHours() - hours); // n시간 전 시점
+
+    // 1. 노드별 데이터 집계
+    const aggregatedData = await Transition.aggregate([
+      // 최근 N시간 내의 전환만 필터링
+      { $match: { createdAt: { $gte: cutoffDate } } },
+      // toNodeId를 기준으로 그룹화
+      {
+        $group: {
+          _id: "$toNodeId", // 전환된 노드 ID
+          totalVisits: { $sum: 1 }, // 총 방문 횟수
+          uniqueUsers: { $addToSet: "$userId" }, // 고유 사용자 ID 집합
+          totalDuration: { $sum: "$duration" }, // 총 체류 시간
+          lastActivity: { $max: "$createdAt" }, // 마지막 활동 시간
+        },
+      },
+      // Node 정보 조인 (roomKey 가져오기 위함)
+      {
+        $lookup: {
+          from: "nodes", // 'nodes' 컬렉션과 조인 (MongoDB는 컬렉션 이름을 소문자 복수형으로 저장)
+          localField: "_id",
+          foreignField: "_id",
+          as: "nodeInfo",
+        },
+      },
+      { $unwind: "$nodeInfo" }, // 조인된 배열을 객체로 변환
+      // roomKey 필드 추가 및 uniqueUsers 배열의 길이 계산
+      {
+        $project: {
+          _id: 0,
+          roomKey: "$nodeInfo.roomKey",
+          totalVisits: 1,
+          uniqueUsersCount: { $size: "$uniqueUsers" },
+          avgDurationPerVisit: {
+            $cond: [
+              { $eq: ["$totalVisits", 0] },
+              0,
+              { $divide: ["$totalDuration", "$totalVisits"] },
+            ],
+          },
+          lastActivity: 1,
+          createdAt: "$nodeInfo.createdAt", // 노드 생성 시간 추가
+        },
+      },
+      // 최소 방문 횟수 필터링
+      { $match: { totalVisits: { $gte: minVisits } } },
+    ]);
+
+    // 2. 큐레이션 점수 계산
+    const hotNodes = aggregatedData
+      .map((node) => {
+        // --- 큐레이션 공식 정의 ---
+        const VISIT_WEIGHT = 0.5; // 방문 수 가중치
+        const USER_WEIGHT = 0.8; // 고유 사용자 수 가중치
+        const DURATION_WEIGHT = 0.3; // 평균 체류 시간 가중치
+        const RECENCY_WEIGHT = 1.2; // 최신 활동 가중치
+        const CREATION_RECENCY_WEIGHT = 0.5; // 노드 생성 시점 가중치
+
+        // 각 지표 정규화 (최대값으로 나누기)
+        // 실제 서비스에서는 기준 값을 고정하거나, 시간에 따라 동적으로 계산하는 로직 필요
+        const maxVisits = 100; // 예를 들어, 최대 방문 수 기준
+        const maxUsers = 20; // 예를 들어, 최대 고유 사용자 수 기준
+        const maxDuration = 300; // 예를 들어, 최대 평균 체류 시간 기준 (초)
+
+        const normalizedVisits = Math.min(node.totalVisits / maxVisits, 1);
+        const normalizedUsers = Math.min(node.uniqueUsersCount / maxUsers, 1);
+        const normalizedDuration = Math.min(
+          node.avgDurationPerVisit / maxDuration,
+          1
+        );
+
+        // 최신 활동 가중치: 현재 시간과 마지막 활동 시간의 차이를 이용 (최근일수록 높음)
+        const timeDiffHoursLastActivity =
+          (Date.now() - new Date(node.lastActivity).getTime()) /
+          (1000 * 60 * 60);
+        // 지수적으로 감소하는 함수 사용 (예: e^(-x/decayFactor))
+        const recencyScoreLastActivity = Math.exp(
+          -timeDiffHoursLastActivity / 12
+        ); // 12시간마다 절반으로 감소
+
+        // 노드 생성 시점 가중치: 노드가 오래될수록 가점 감소 (새로운 노드에 가점)
+        const timeDiffHoursCreatedAt =
+          (Date.now() - new Date(node.createdAt).getTime()) / (1000 * 60 * 60);
+        const recencyScoreCreatedAt = Math.exp(-timeDiffHoursCreatedAt / 24); // 24시간마다 절반으로 감소
+
+        // 최종 점수 계산
+        const score =
+          normalizedVisits * VISIT_WEIGHT +
+          normalizedUsers * USER_WEIGHT +
+          normalizedDuration * DURATION_WEIGHT +
+          recencyScoreLastActivity * RECENCY_WEIGHT +
+          recencyScoreCreatedAt * CREATION_RECENCY_WEIGHT;
+
+        return { ...node, score: score };
+      })
+      .sort((a, b) => b.score - a.score) // 점수 내림차순 정렬
+      .slice(0, limit); // 상위 N개만 선택
+
+    res.json(hotNodes);
+  } catch (error) {
+    console.error("[에러] 핫 노드 조회 실패:", error);
+    res.status(500).json({ message: "핫 노드를 불러오는데 실패했습니다." });
+  }
 });
 
 // --- 4. 서버 실행 ---
