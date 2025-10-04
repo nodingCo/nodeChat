@@ -304,7 +304,7 @@
             data-i18n-key="nicknamePlaceholder"
             placeholder="닉네임을 입력하세요"
             autocomplete="off"
-            maxlength="10"
+            maxlength="20"
           />
           <button id="regen-nickname-btn">🔄</button>
         </div>
@@ -716,19 +716,22 @@
       function joinChat() {
         const nickname = nicknameInput.value.trim();
         const roomKey = roomKeyInput.value.trim();
-        // 글자 수를 정확히 세도록 수정하고, 닉네임과 방 제목 검사를 분리합니다.
-        if (!nickname || nickname.length > 10) {
+
+        // 언어별 닉네임 최대 길이 설정
+        const maxLength = currentLang === "ko" ? 10 : 20;
+
+        if (!nickname || nickname.length > maxLength) {
           alert(translations[currentLang].alertNickname);
           return;
         }
         if (!roomKey) {
-          // 방 제목(노드)이 비어있을 때를 위한 알림을 추가하면 더 좋습니다.
           alert(
             translations[currentLang].alertRoomKey ||
               "Please enter a node title."
           );
           return;
         }
+
         currentUser.nickname = nickname;
         localStorage.setItem("userNickname", nickname);
         socket.emit("userSetup", {
