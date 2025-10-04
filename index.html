@@ -345,12 +345,12 @@
         <p data-i18n-key="entryDescription">
           지금 관심있는 주제를 입력해서<br />사람들을 만나보세요.
         </p>
-        <div class="hot-nodes-section">
+        <!-- <div class="hot-nodes-section">
           <h2 data-i18n-key="hotNodesTitle">🔥 인기 노드</h2>
           <div class="hot-nodes-list" id="hot-nodes-list">
             <p data-i18n-key="loadingHotNodes">인기 노드를 불러오는 중...</p>
           </div>
-        </div>
+        </div> -->
         <div class="nickname-wrapper" style="margin-top: 20px">
           <input
             type="text"
@@ -875,7 +875,7 @@
         messageInput.value = "";
       }
 
-      // ✨ 핫 노드를 불러오는 함수 추가
+      <!-- // ✨ 핫 노드를 불러오는 함수 추가
       async function loadHotNodes() {
         hotNodesList.innerHTML = `<p>${translations[currentLang].loadingHotNodes}</p>`;
         try {
@@ -924,7 +924,7 @@
             "인기 노드를 불러오는데 실패했습니다."
           }</p>`;
         }
-      }
+      } -->
 
       // --- 6. 서버로부터 오는 이벤트 듣기 ---
       socket.on("sessionEstablished", ({ userId, nickname }) => {
