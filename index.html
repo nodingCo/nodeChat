@@ -205,10 +205,10 @@
         flex-direction: column;
         max-width: 85%;
       }
-      .message-group.sent {
+      /* .message-group.sent {
         align-self: flex-end;
         align-items: flex-end;
-      }
+      } */
       .message-group.received {
         align-self: flex-start;
         align-items: flex-start;
@@ -672,28 +672,38 @@
         });
       }
 
+      // index.html의 <script> 태그 안
+
       function addMessageToLog(message) {
         const msgGroup = document.createElement("div");
         msgGroup.classList.add("message-group");
+
         const senderInfo = document.createElement("div");
         senderInfo.classList.add("sender-info");
+
         const timestampSpan = document.createElement("span");
         timestampSpan.classList.add("timestamp");
         timestampSpan.textContent = formatTimestamp(message.createdAt);
+
         const msgText = document.createElement("div");
         msgText.classList.add("message-text");
         msgText.textContent = message.text;
+
+        // 닉네임을 표시하는 로직을 통합합니다.
+        const nicknameSpan = document.createElement("span");
+        nicknameSpan.classList.add("nickname");
+        nicknameSpan.textContent = message.senderNickname;
+
+        senderInfo.appendChild(nicknameSpan);
+        senderInfo.appendChild(timestampSpan);
+
+        // 내가 보낸 메시지인지 여부를 구분하는 class는 그대로 유지할 수 있습니다.
         if (message.userId === currentUser.id) {
           msgGroup.classList.add("sent");
-          senderInfo.appendChild(timestampSpan);
         } else {
           msgGroup.classList.add("received");
-          const nicknameSpan = document.createElement("span");
-          nicknameSpan.classList.add("nickname");
-          nicknameSpan.textContent = message.senderNickname;
-          senderInfo.appendChild(nicknameSpan);
-          senderInfo.appendChild(timestampSpan);
         }
+
         msgGroup.appendChild(senderInfo);
         msgGroup.appendChild(msgText);
         chatLog.appendChild(msgGroup);
