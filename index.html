@@ -196,29 +196,30 @@
         overflow-y: auto;
         display: flex;
         flex-direction: column;
-        gap: 4px; /* 버블 간 간격 줄임 */
-        background-color: #ffffff; /* 배경을 흰색으로 변경 */
+        gap: 10px; /* 라인 간 간격 */
+        background-color: #ffffff; /* 배경을 흰색으로 */
       }
       .message {
-        max-width: 75%;
-        padding: 8px 14px; /* 내부 여백(상하/좌우) 줄임 */
-        border-radius: 18px;
+        /* 기존 버블 스타일 제거 */
+        padding: 0;
+        background: none;
         word-wrap: break-word;
-        line-height: 1.4; /* 줄 간격 약간 줄임 */
-        position: relative;
+        line-height: 1.5;
+        border-radius: 0;
+        max-width: 100%;
       }
       .message.sent {
-        background: var(--sent-bubble-bg);
-        color: white;
         align-self: flex-end;
-        border-bottom-right-radius: 5px;
+        text-align: right; /* 오른쪽 정렬 */
+        color: var(--text-primary);
       }
       .message.received {
-        background: #f0f2f5; /* 받는 메시지 배경을 더 차분하게 */
-        color: var(--text-primary);
         align-self: flex-start;
-        border-bottom-left-radius: 5px;
+        color: var(--text-primary);
       }
+      /* 받는 메시지에 닉네임을 표시하기 위해 JS 수정이 필요하지만,
+         CSS만으로도 이런 느낌을 낼 수 있다는 것을 보여드립니다.
+         실제 구현을 원하시면 JS 코드도 함께 수정해 드릴 수 있습니다. */
       .system-message {
         text-align: center;
         color: var(--text-secondary);
